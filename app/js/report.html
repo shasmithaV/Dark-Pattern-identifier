@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Dark Patterns</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+</head>
+
+<body>
+    <button id="report">Dark Patterns</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script src="canva.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const reportButton = document.getElementById('report');
+            reportButton.addEventListener('click', reportDarkPatterns);
+
+            function reportDarkPatterns() {
+                chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                    const tab = tabs[0];
+                    chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' }, function (dataUrl) {
+                        const description = prompt('Enter description for the screenshot:');
+                        if (description === null) return;
+                        const img = new Image();
+                        img.onload = function () {
+                            const cropper = new Cropper(img, {
+                                aspectRatio: NaN, 
+                                viewMode: 1, 
+                                zoomable: false, 
+                                crop(event) {
+                                    const canvas = cropper.getCroppedCanvas();
+                                    const croppedDataUrl = canvas.toDataURL('image/png');
+
+                                    sendData(croppedDataUrl, description);
+                                }
+                            });
+
+                            cropper.replace(dataUrl);
+                        };
+
+                        img.src = dataUrl;
+                    });
+                });
+            }
+
+            function sendData(imageData, description) {
+                fetch('http://127.0.0.1:5000/report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: imageData,
+                        description: description
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error occurred while reporting. Please try again later.');
+                    });
+            }
+        });
+
+    </script>
+</body>
+
+</html>
